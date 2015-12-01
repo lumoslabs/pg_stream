@@ -32,13 +32,22 @@ require 'pg'
 body = 'SELECT * FROM huge_table;'
 
 conn = PG::Connection.open(:dbname => 'test')
-query_stream = PgStream::Stream.new(conn, body)
 
-# You can get the headers from the Stream object.
-headers = query_stream.headers
+query_stream = PgStream::Stream.new(conn, body)
 ```
 
-You use the Processor to consume the data from the db. The processor will register `before_execute`, `during_execute` and `after_execute` callbacks. The processor yields the `row` and `row_count` to the `during_execute` callback, and the `row_count` to the `after_execute` callback.
+You can consume directly from the stream by calling `headers` and `each_row`:
+
+```ruby
+CSV.open('some_filepath', 'w') do |csv|
+  csv << query_stream.headers
+  query_stream.each_row do |row|
+    csv << row
+  end
+end
+```
+
+Or if you have multiple things that need the data you may use the Processor to consume the data from the db. The processor will register `before_execute`, `during_execute` and `after_execute` callbacks. The processor yields the `row` and `row_count` to the `during_execute` callback, and the `row_count` to the `after_execute` callback.
 
 ```ruby
 stream_processor = PgStream::Processor.new(query_stream)
@@ -57,6 +66,15 @@ stream_processor.register(
     after_execute: ->(_row_count) { @csv.close }
   }
 )
+
+def collect_sample
+  @sample = []
+  lambda do |row, row_count|
+    @sample << row if row_count <= 100
+  end
+end
+
+stream_processor.register(during_execute: collect_sample)
 ```
 
 You may call register multiple times on a single Processor.
