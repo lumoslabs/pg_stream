@@ -39,8 +39,10 @@ query_stream = PgStream::Stream.new(conn, body)
 You can consume directly from the stream by calling `headers` and `each_row`:
 
 ```ruby
+headers = query_stream.headers
+
 CSV.open('some_filepath', 'w') do |csv|
-  csv << query_stream.headers
+  csv << headers
   query_stream.each_row do |row|
     csv << row
   end
